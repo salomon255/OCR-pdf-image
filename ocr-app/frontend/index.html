@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="utf-8" /><title>OCR App</title></head>
+<body>Hello OCR</body>
+</html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OCR en ligne</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    .drop { border: 2px dashed #888; padding: 24px; border-radius: 12px; text-align:center; }
+    .drop.drag { border-color: #222; background: #fafafa; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    textarea { width:100%; min-height: 280px; padding:12px; }
+    button { padding:10px 16px; border-radius:8px; border:1px solid #ccc; cursor:pointer; }
+    input[type=file] { display:none; }
+    label.btn { display:inline-block; padding:10px 16px; background:#111; color:#fff; border-radius:8px; cursor:pointer; }
+    small { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>OCR (PDF / Images ➜ Texte)</h1>
+  <p>Sélectionne un fichier PDF/JPG/PNG… puis clique <b>Extraire</b>.</p>
+
+  <div class="row">
+    <label class="btn" for="f">Choisir un fichier</label>
+    <input id="f" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"/>
+    <select id="lang">
+      <option value="eng+fra">Anglais + Français</option>
+      <option value="fra">Français</option>
+      <option value="eng">Anglais</option>
+    </select>
+    <input id="dpi" type="number" min="72" max="600" value="300" />
+    <button id="go">Extraire</button>
+  </div>
+  <p><small>Astuce : un DPI plus élevé peut améliorer la qualité sur certains PDF scannés.</small></p>
+
+  <div id="drop" class="drop" tabindex="0">Glisse-dépose ton fichier ici</div>
+
+  <h3>Texte extrait</h3>
+  <textarea id="out" placeholder="Le texte OCR apparaîtra ici…"></textarea>
+
+  <script>
+    const API_URL = "http://localhost:8000/ocr"; // ➜ mets l’URL de ton backend déployé
+
+    const f = document.getElementById('f');
+    const go = document.getElementById('go');
+    const out = document.getElementById('out');
+    const lang = document.getElementById('lang');
+    const dpi = document.getElementById('dpi');
+    const drop = document.getElementById('drop');
+
+    function setFile(file) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      f.files = dt.files;
+      drop.textContent = `Fichier prêt: ${file.name}`;
+    }
+
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault(); drop.classList.remove('drag');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+    });
+
+    go.addEventListener('click', async () => {
+      if (!f.files[0]) { alert("Choisis un fichier d’abord."); return; }
+      const fd = new FormData();
+      fd.append('file', f.files[0]);
+      fd.append('lang', lang.value);
+      fd.append('dpi', dpi.value);
+      fd.append('format', 'text'); // tu peux renvoyer JSON si tu veux: 'json'
+
+      out.value = "Traitement en cours…";
+      try {
+        const r = await fetch(API_URL, { method: 'POST', body: fd });
+        const ct = r.headers.get('content-type') || '';
+        if (ct.includes('text/plain')) {
+          out.value = await r.text();
+        } else {
+          const data = await r.json();
+          if (data.text) out.value = data.text;
+          else out.value = JSON.stringify(data, null, 2);
+        }
+      } catch (err) {
+        out.value = "Erreur: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
